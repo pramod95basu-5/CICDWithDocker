@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: CI For dockerised Flask app
 
 # Controls when the workflow will run
 on:
@@ -10,27 +10,62 @@ on:
   pull_request:
     branches: [ "main" ]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  # This workflow contains a 2 jobs 
+  build-and-test: # JOB1
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: checkout code
+        uses: actions/checkout@v4
 
       # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - name: set up python
+        run: actions/setup-python
+        with:
+          python-version: '3.9'
 
       # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: install dependencies
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          python -m pip install --upgrade pip,
+          python install flask
+          python install pytest
+
+      - name: Run test
+        run: |
+          pytest
+
+  build-and-publish: # JOB2
+    needs: build and test
+    runs-on: ubuntu-latest
+
+    steps:
+     - name: checkout code
+       uses: actions/checkout@v3     
+
+     - name: Set up Docker Buildx
+       uses: docker/setup-buildx-action@v2  
+     
+     - name: Login to DockerHub
+       uses: docker/login-actions@v2
+       with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+     - name: Build and push docker image
+       uses: docker/build-push-action@v4
+       with:
+        context: 
+          file: ./DockerFile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/flasktest-app:latest  
+
+     - name: Image digest
+       run: echo ${{ steps.build-and-publish.outputs.digest }}      
